@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>نظام متابعة الأداء والدراسة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&display=swap');
+        body {
+            font-family: 'IBM Plex Sans Arabic', sans-serif;
+            background-color: #f4f4f5;
+            color: #18181b;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .panel {
+            background-color: #ffffff;
+            border: 1px solid #e4e4e7;
+            border-radius: 6px;
+        }
+        .btn-primary {
+            background-color: #27272a;
+            color: #fafafa;
+            border-radius: 4px;
+            transition: background-color 0.15s ease;
+        }
+        .btn-primary:hover { background-color: #3f3f46; }
+        .btn-secondary {
+            background-color: #f4f4f5;
+            color: #27272a;
+            border: 1px solid #d4d4d8;
+            border-radius: 4px;
+            transition: background-color 0.15s ease;
+        }
+        .btn-secondary:hover { background-color: #e4e4e7; }
+        input, textarea, select {
+            border: 1px solid #d4d4d8;
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #52525b;
+            background-color: #ffffff;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-3 md:p-6">
+
+    <div class="max-w-5xl mx-auto space-y-4">
+        
+        <!-- الشريط العلوي وإعدادات الربط -->
+        <header class="panel p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-lg font-semibold text-zinc-900">بيئة العمل الأكاديمية ومتابعة الأداء</h1>
+                <p id="authStatus" class="text-xs text-zinc-500 mt-0.5">الحالة: غير متصل بحساب Google</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <input id="clientIdInput" type="text" placeholder="أدخل Google OAuth Client ID" class="text-xs px-3 py-2 w-full md:w-64" />
+                <button onclick="authenticateWithGoogle()" class="btn-primary text-xs px-4 py-2 font-medium w-full md:w-auto">
+                    الربط عبر حساب Google
+                </button>
+            </div>
+        </header>
+
+        <!-- الشبكة الرئيسية -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+            
+            <!-- العمود الأيمن: البومودورو والمهام (5 أعمدة) -->
+            <div class="md:col-span-5 space-y-4">
+                
+                <!-- مؤقت بومودورو -->
+                <section class="panel p-5">
+                    <div class="flex justify-between items-center border-b border-zinc-200 pb-3 mb-4">
+                        <h2 class="text-sm font-semibold text-zinc-800">مؤقت التركيز (Pomodoro)</h2>
+                        <span id="timerMode" class="text-xs text-zinc-500">جلسة عمل (25 دقيقة)</span>
+                    </div>
+                    <div class="text-center py-4">
+                        <div id="timerDisplay" class="text-5xl font-light tracking-wider text-zinc-900 tabular-nums">25:00</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-2">
+                        <button onclick="startTimer()" class="btn-primary py-2 text-xs font-medium">بدء</button>
+                        <button onclick="pauseTimer()" class="btn-secondary py-2 text-xs font-medium">إيقاف مؤقت</button>
+                        <button onclick="resetTimer()" class="btn-secondary py-2 text-xs font-medium">إعادة ضبط</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-zinc-100">
+                        <button onclick="setMode(25, 'جلسة عمل')" class="text-xs text-zinc-600 py-1 hover:underline">تركيز (25 د)</button>
+                        <button onclick="setMode(5, 'استراحة قصيرة')" class="text-xs text-zinc-600 py-1 hover:underline">استراحة (5 د)</button>
+                    </div>
+                </section>
+
+                <!-- قائمة المهام وأحداث التقويم -->
+                <section class="panel p-5">
+                    <div class="flex justify-between items-center border-b border-zinc-200 pb-3 mb-3">
+                        <h2 class="text-sm font-semibold text-zinc-800">مهام اليوم (Google Calendar & To-Do)</h2>
+                        <button onclick="fetchCalendarEvents()" class="text-xs text-zinc-600 hover:text-zinc-900 underline">تحديث من التقويم</button>
+                    </div>
+                    
+                    <div class="flex gap-2 mb-3">
+                        <input id="manualTaskInput" type="text" placeholder="إضافة مهمة يدوية..." class="text-xs px-3 py-2 flex-1" />
+                        <button onclick="addManualTask()" class="btn-secondary px-3 py-2 text-xs font-medium">إضافة</button>
+                    </div>
+
+                    <p class="text-xs text-zinc-500 mb-2">اضغط على أي مهمة لتحديدها وتوليد أسئلة التحقق أو إضافة ملاحظات:</p>
+                    <ul id="taskList" class="divide-y divide-zinc-200 text-xs max-h-72 overflow-y-auto">
+                        <!-- يتم تعبئة المهام هنا -->
+                    </ul>
+                </section>
+
+            </div>
+
+            <!-- العمود الأيسر: الملاحظات الصوتية/الكتابية والتقييم الذكي (7 أعمدة) -->
+            <div class="md:col-span-7 space-y-4">
+                
+                <!-- قسم الملاحظات الكتابية والصوتية -->
+                <section class="panel p-5">
+                    <div class="flex justify-between items-center border-b border-zinc-200 pb-3 mb-3">
+                        <div>
+                            <h2 class="text-sm font-semibold text-zinc-800">سجل الملاحظات الكتابية والصوتية</h2>
+                            <p id="selectedTaskLabel" class="text-xs text-zinc-500 mt-0.5">المهمة المحددة: لم يتم اختيار مهمة</p>
+                        </div>
+                        <button id="voiceBtn" onclick="toggleVoiceRecording()" class="btn-secondary px-3 py-1.5 text-xs font-medium">
+                            بدء التسجيل الصوتي
+                        </button>
+                    </div>
+
+                    <textarea id="taskNotes" rows="5" class="w-full p-3 text-xs leading-relaxed" placeholder="اكتب ملاحظاتك حول ما درسته في هذه المهمة، أو اضغط على 'بدء التسجيل الصوتي' وتحدث ليتم تفريغ النص هنا تلقائياً..."></textarea>
+
+                    <div class="flex flex-wrap gap-2 mt-3 justify-between">
+                        <button onclick="saveNoteToCalendar()" class="btn-secondary px-4 py-2 text-xs font-medium">
+                            حفظ الملاحظة في Google Calendar
+                        </button>
+                        <button onclick="analyzeAndGenerateQuestions()" class="btn-primary px-4 py-2 text-xs font-medium">
+                            تحليل الملاحظات وتوليد أسئلة تقييم (Gemini)
+                        </button>
+                    </div>
+                </section>
+
+                <!-- قسم التحليل وأسئلة التقييم من Gemini -->
+                <section class="panel p-5">
+                    <div class="border-b border-zinc-200 pb-3 mb-3">
+                        <h2 class="text-sm font-semibold text-zinc-800">التحليل والتقييم الأكاديمي (Gemini OAuth)</h2>
+                        <p class="text-xs text-zinc-500 mt-0.5">يقوم النموذج بقراءة عنوان المهمة وملاحظاتك لاختبار مدى استيعابك الفعلي</p>
+                    </div>
+
+                    <div id="aiOutput" class="bg-zinc-50 border border-zinc-200 rounded p-4 text-xs leading-relaxed text-zinc-800 min-h-[140px] whitespace-pre-wrap">قم باختيار مهمة من القائمة وكتابة أو تسجيل ملاحظاتك، ثم اضغط على زر التحليل لتوليد أسئلة تقييم مخصصة.</div>
+
+                    <!-- الإجابة على أسئلة الذكاء الاصطناعي -->
+                    <div class="mt-4 pt-3 border-t border-zinc-200">
+                        <label class="block text-xs font-medium text-zinc-700 mb-1.5">إجابتك على أسئلة التقييم:</label>
+                        <textarea id="userAnswer" rows="3" class="w-full p-3 text-xs" placeholder="اكتب إجابتك هنا ليقوم النموذج بتصحيحها وإعطائك نسبة الاستيعاب..."></textarea>
+                        <button onclick="evaluateUserAnswer()" class="btn-primary px-4 py-2 text-xs font-medium mt-2">
+                            إرسال الإجابة للتقييم وحساب درجة التقدم
+                        </button>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // المتغيرات العامة
+        let accessToken = null;
+        let tokenClient = null;
+        let selectedTask = null;
+        
+        // مهام افتراضية من جدولك الدراسي للعمل فوراً حتى قبل الربط
+        let tasks = JSON.parse(localStorage.getItem('minimal_academic_tasks')) || [
+            { id: 'local-1', title: 'دراسة Kaggle: Random Forests & Classification', notes: 'درست كيفية تقليل Overfitting عبر تحديد max_depth وعدد الأشجار n_estimators.', done: false, isCalendar: false },
+            { id: 'local-2', title: 'تطبيق عملي: House Prices & Custom Cross-Validation', notes: 'استخدمت StratifiedKFold لتقسيم البيانات بشكل متوازن قبل التدريب.', done: false, isCalendar: false },
+            { id: 'local-3', title: 'قراءة الجزء الأول: Fundamentals of Machine Learning', notes: '', done: false, isCalendar: false }
+        ];
+
+        // 1. إدارة المصادقة عبر حساب جوجل (OAuth 2.0 بدون API Key)
+        function authenticateWithGoogle() {
+            const clientId = document.getElementById('clientIdInput').value.trim() || localStorage.getItem('google_oauth_client_id');
+            if (!clientId) {
+                alert('يرجى إدخال Google OAuth Client ID أولاً. ستجد خطوات استخراجه المجانية أسفل الكود.');
+                return;
+            }
+            localStorage.setItem('google_oauth_client_id', clientId);
+
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                // الصلاحيات: قراءة وكتابة التقويم + الوصول إلى نموذج Gemini عبر الحساب الشخصي
+                scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/generative-language.retriever',
+                callback: (tokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        accessToken = tokenResponse.access_token;
+                        document.getElementById('authStatus').innerText = 'الحالة: متصل بحساب Google بنجاح (التقويم + Gemini)';
+                        fetchCalendarEvents();
+                    }
+                },
+            });
+            tokenClient.requestAccessToken();
+        }
+
+        // 2. جلب الأحداث والملاحظات من Google Calendar
+        async function fetchCalendarEvents() {
+            if (!accessToken) {
+                alert('يرجى الربط بحساب Google أولاً لجلب أحداث التقويم.');
+                return;
+            }
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date();
+            endOfDay.setHours(23, 59, 59, 999);
+
+            const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfDay.toISOString()}&timeMax=${endOfDay.toISOString()}&singleEvents=true&orderBy=startTime`;
+
+            try {
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const data = await res.json();
+                if (data.items) {
+                    const calTasks = data.items.map(item => ({
+                        id: item.id,
+                        title: item.summary || 'حدث بدون عنوان',
+                        notes: item.description || '',
+                        done: false,
+                        isCalendar: true
+                    }));
+                    // دمج مهام التقويم مع المهام اليدوية
+                    tasks = [...calTasks, ...tasks.filter(t => !t.isCalendar)];
+                    saveAndRenderTasks();
+                }
+            } catch (err) {
+                console.error(err);
+                alert('حدث خطأ أثناء جلب بيانات التقويم.');
+            }
+        }
+
+        // تحديث الملاحظات داخل حدث Google Calendar نفسه
+        async function saveNoteToCalendar() {
+            if (!selectedTask) return alert('اختر مهمة أولاً.');
+            selectedTask.notes = document.getElementById('taskNotes').value;
+            saveAndRenderTasks();
+
+            if (selectedTask.isCalendar && accessToken) {
+                const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${selectedTask.id}`;
+                await fetch(url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ description: selectedTask.notes })
+                });
+                alert('تم تحديث الملاحظات في Google Calendar بنجاح.');
+            } else {
+                alert('تم حفظ الملاحظة محلياً.');
+            }
+        }
+
+        // 3. الاتصال بـ Gemini عبر OAuth Bearer Token (بدون API Key)
+        async function callGeminiWithOAuth(promptText) {
+            if (!accessToken) {
+                return 'تنبيه: أنت غير متصل بحساب Google حالياً. للاتصال بـ Gemini بدون API Key، يرجى إدخال OAuth Client ID والضغط على زر الربط في الأعلى.\n\n[وضع المحاكاة المحلية للأسئلة بناءً على ملاحظاتك]:\n1. اشرح كيف تؤثر المعايير التي ذكرتها في ملاحظاتك على أداء النموذج في البيانات غير المرئية (Unseen Data)؟\n2. ما هي المقايضة (Trade-off) الأساسية في الطريقة التي طبقتها اليوم؟';
+            }
+
+            const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: promptText }] }]
+                })
+            });
+
+            const data = await response.json();
+            if (data.candidates && data.candidates[0].content) {
+                return data.candidates[0].content.parts[0].text;
+            } else {
+                throw new Error(data.error ? data.error.message : 'فشل الاتصال بنموذج Gemini');
+            }
+        }
+
+        async function analyzeAndGenerateQuestions() {
+            if (!selectedTask) return alert('يرجى تحديد مهمة من القائمة أولاً.');
+            const notes = document.getElementById('taskNotes').value.trim();
+            selectedTask.notes = notes;
+            saveAndRenderTasks();
+
+            const outputDiv = document.getElementById('aiOutput');
+            outputDiv.innerText = 'جاري تحليل المهمة والملاحظات وتوليد أسئلة التحقق...';
+
+            const prompt = `أنت مشرف أكاديمي دقيق في علوم البيانات والذكاء الاصطناعي. لا تستخدم أي إيموجي نهائياً.
+المهمة الحالية للطالب هي: "${selectedTask.title}".
+الملاحظات التي سجلها الطالب (كتابياً أو صوتياً) هي: "${notes || 'لم يسجل ملاحظات تفصيلية بعد'}".
+
+المطلوب منك:
+1. تلخيص وتنظيم النقاط التي ذكرها الطالب بشكل علمي موجز.
+2. طرح 3 أسئلة تقنية عميقة ومباشرة لاختبار مدى فهمه الحقيقي لما أنجزه في هذه المهمة وكشف أي ثغرات في استيعابه.`;
+
+            try {
+                const reply = await callGeminiWithOAuth(prompt);
+                outputDiv.innerText = reply;
+            } catch (e) {
+                outputDiv.innerText = 'خطأ في الاتصال: ' + e.message;
+            }
+        }
+
+        async function evaluateUserAnswer() {
+            if (!selectedTask) return alert('حدد المهمة أولاً.');
+            const questions = document.getElementById('aiOutput').innerText;
+            const answer = document.getElementById('userAnswer').value.trim();
+            if (!answer) return alert('اكتب إجابتك أولاً.');
+
+            const outputDiv = document.getElementById('aiOutput');
+            outputDiv.innerText = 'جاري تقييم إجابتك وحساب درجة الاستيعاب...';
+
+            const prompt = `بدون استخدام أي إيموجي، قم بتقييم إجابة الطالب التالية بناءً على الأسئلة المطروحة وموضوع المهمة (${selectedTask.title}).
+الأسئلة السابقة: ${questions}
+إجابة الطالب: ${answer}
+
+المطلوب:
+1. تصحيح الإجابة وتوضيح النقاط الصحيحة والنقاط الناقصة.
+2. إعطاء درجة استيعاب دقيقة من 100%.`;
+
+            try {
+                const reply = await callGeminiWithOAuth(prompt);
+                outputDiv.innerText = reply;
+            } catch (e) {
+                outputDiv.innerText = 'خطأ في التقييم: ' + e.message;
+            }
+        }
+
+        // 4. التسجيل الصوتي وتحويله إلى نص (Web Speech API)
+        let recognition = null;
+        let isRecording = false;
+
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ar-JO'; // يدعم العربية مع المصطلحات الإنجليزية
+            recognition.continuous = true;
+            recognition.interimResults = false;
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript + ' ';
+                }
+                const notesArea = document.getElementById('taskNotes');
+                notesArea.value = (notesArea.value + ' ' + transcript).trim();
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('voiceBtn').innerText = 'بدء التسجيل الصوتي';
+            };
+        }
+
+        function toggleVoiceRecording() {
+            if (!recognition) return alert('متصفحك الحالي لا يدعم تحويل الصوت إلى نص مباشرة. يفضل استخدام Google Chrome على الهاتف أو الحاسوب.');
+            if (!isRecording) {
+                recognition.start();
+                isRecording = true;
+                document.getElementById('voiceBtn').innerText = 'إيقاف التسجيل الصوتي...';
+            } else {
+                recognition.stop();
+                isRecording = false;
+                document.getElementById('voiceBtn').innerText = 'بدء التسجيل الصوتي';
+            }
+        }
+
+        // 5. إدارة قائمة المهام (To-Do List)
+        function saveAndRenderTasks() {
+            localStorage.setItem('minimal_academic_tasks', JSON.stringify(tasks));
+            const list = document.getElementById('taskList');
+            list.innerHTML = '';
+            tasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                li.className = `py-2.5 px-2 flex items-center justify-between cursor-pointer hover:bg-zinc-100 rounded ${selectedTask && selectedTask.id === task.id ? 'bg-zinc-100 font-semibold' : ''}`;
+                li.onclick = () => selectTask(index);
+
+                li.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <input type="checkbox" ${task.done ? 'checked' : ''} onclick="event.stopPropagation(); toggleTaskDone(${index})" class="w-4 h-4 accent-zinc-800" />
+                        <span class="${task.done ? 'line-through text-zinc-400' : 'text-zinc-800'}">${task.title}</span>
+                    </div>
+                    <span class="text-[10px] text-zinc-400 border border-zinc-200 px-1.5 py-0.5 rounded">${task.isCalendar ? 'Calendar' : 'يدوي'}</span>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        function selectTask(index) {
+            selectedTask = tasks[index];
+            document.getElementById('selectedTaskLabel').innerText = `المهمة المحددة: ${selectedTask.title}`;
+            document.getElementById('taskNotes').value = selectedTask.notes || '';
+            saveAndRenderTasks();
+        }
+
+        function toggleTaskDone(index) {
+            tasks[index].done = !tasks[index].done;
+            saveAndRenderTasks();
+        }
+
+        function addManualTask() {
+            const input = document.getElementById('manualTaskInput');
+            if (!input.value.trim()) return;
+            tasks.unshift({
+                id: 'manual-' + Date.now(),
+                title: input.value.trim(),
+                notes: '',
+                done: false,
+                isCalendar: false
+            });
+            input.value = '';
+            saveAndRenderTasks();
+        }
+
+        // 6. مؤقت البومودورو (Pomodoro Timer)
+        let timeLeft = 25 * 60;
+        let timerInterval = null;
+
+        function updateTimerDisplay() {
+            const m = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+            const s = String(timeLeft % 60).padStart(2, '0');
+            document.getElementById('timerDisplay').innerText = `${m}:${s}`;
+        }
+
+        function startTimer() {
+            if (timerInterval) return;
+            timerInterval = setInterval(() => {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    updateTimerDisplay();
+                } else {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    alert('انتهى وقت الجلسة. قم بتسجيل ملاحظاتك الآن وإجراء تقييم الفهم.');
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            timeLeft = 25 * 60;
+            updateTimerDisplay();
+        }
+
+        function setMode(minutes, label) {
+            pauseTimer();
+            timeLeft = minutes * 60;
+            document.getElementById('timerMode').innerText = `${label} (${minutes} دقيقة)`;
+            updateTimerDisplay();
+        }
+
+        // التشغيل المبدئي
+        window.onload = () => {
+            const savedClientId = localStorage.getItem('google_oauth_client_id');
+            if (savedClientId) document.getElementById('clientIdInput').value = savedClientId;
+            saveAndRenderTasks();
+            if (tasks.length > 0) selectTask(0);
+        };
+    </script>
+</body>
+</html>
